@@ -1,0 +1,16 @@
+{
+  "name": "browser-extension-ci-cd",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable build and packaging tooling for browser extensions.",
+  "scripts": {
+    "build:extension": "node scripts/build-extension.mjs",
+    "test": "node test/build-extension.test.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

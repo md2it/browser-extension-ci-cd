@@ -1,0 +1,28 @@
+name: Build browser extension
+description: Minify a browser extension in temporary staging and create a ZIP archive.
+inputs:
+  extension-root:
+    description: Path to the extension root containing manifest.json.
+    required: true
+  output-zip:
+    description: Path for the created ZIP archive.
+    required: true
+outputs:
+  zip-path:
+    description: Absolute path to the created ZIP archive.
+    value: ${{ steps.build.outputs.zip-path }}
+runs:
+  using: composite
+  steps:
+    - name: Install build dependencies
+      shell: bash
+      run: npm ci --prefix "$GITHUB_ACTION_PATH"
+    - name: Build ZIP archive
+      id: build
+      shell: bash
+      run: |
+        output_zip="$(python3 -c 'import os, sys; print(os.path.abspath(sys.argv[1]))' "${{ inputs.output-zip }}")"
+        node "$GITHUB_ACTION_PATH/scripts/build-extension.mjs" \
+          --extension-root "${{ inputs.extension-root }}" \
+          --output-zip "$output_zip"
+        echo "zip-path=$output_zip" >> "$GITHUB_OUTPUT"
