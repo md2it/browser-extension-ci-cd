@@ -49,7 +49,7 @@ The resulting absolute ZIP path is available as `steps.package.outputs.zip-path`
 ```yaml
 jobs:
   release:
-    uses: md2it/browser-extension-ci-cd/.github/workflows/release-extension.yml@v1.1.0
+    uses: md2it/browser-extension-ci-cd/.github/workflows/release-extension.yml@v1.3.1
     with:
       extension-root: extension
       zip-name: extension.zip
@@ -66,3 +66,5 @@ Store upload is fail-closed: both the product input and repository variable `STO
 For each product, create variables `STORE_UPLOAD_ENABLED` (leave unset or any value other than `true`), `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, and `AMO_ADDON_ID` as applicable. Create secret `CHROME_SERVICE_ACCOUNT_JSON` only after enabling the integration; the service-account email must be granted Chrome Web Store API access. Missing IDs or the secret fail before a store request. AMO secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` are reserved and are not used by the current workflow.
 
 AMO listed upload is intentionally not automated. Current AMO v5 upload requires a `channel` (`listed` or `unlisted`); `listed` submits a version for listing/moderation and does not provide a guaranteed upload-only/no-publication operation. Use the AMO dashboard/manual review flow. `unlisted` signing may be performed manually when self-distribution is intended. To disable Chrome integration, unset or change `STORE_UPLOAD_ENABLED` and/or the product input.
+
+If Chrome returns `IN_PROGRESS`, the workflow polls `publishers.items.fetchStatus` with exponential backoff: 1s, 2s, 4s, up to 10s, for a maximum total of 5 minutes. `SUCCEEDED` succeeds; `FAILED`, `NOT_FOUND`, invalid/unknown states, invalid JSON, HTTP errors, and timeout fail the job. Logs contain status and HTTP codes only; credentials and Authorization headers are never logged.

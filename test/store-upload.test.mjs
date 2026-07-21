@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { waitForUpload } from '../scripts/chrome-webstore-upload.mjs';
 
 const workflow = readFileSync(new URL('../.github/workflows/release-extension.yml', import.meta.url), 'utf8');
 const script = readFileSync(new URL('../scripts/chrome-webstore-upload.mjs', import.meta.url), 'utf8');
@@ -9,4 +10,12 @@ assert.match(workflow, /chrome-service-account-json/);
 assert.match(workflow, /Download ZIP from GitHub Release/);
 assert.doesNotMatch(script, /:publish/);
 assert.match(script, /:upload/);
+const response = (state) => ({ ok: true, json: async () => ({ uploadState: state }) });
+let calls = 0;
+await waitForUpload({ fetchImpl: async () => { calls += 1; return response('SUCCEEDED'); }, token: 'test', publisher: 'publisher', extensionId: 'extension', initialState: 'SUCCEEDED', log: () => {} });
+assert.equal(calls, 0);
+await waitForUpload({ fetchImpl: async () => { calls += 1; return response('SUCCEEDED'); }, token: 'test', publisher: 'publisher', extensionId: 'extension', initialState: 'IN_PROGRESS', timeoutMs: 100, sleep: async () => {}, log: () => {} });
+assert.equal(calls, 1);
+await assert.rejects(waitForUpload({ fetchImpl: async () => response('FAILED'), token: 'test', publisher: 'publisher', extensionId: 'extension', initialState: 'IN_PROGRESS', timeoutMs: 100, sleep: async () => {}, log: () => {} }), /uploadState=FAILED/);
+await assert.rejects(waitForUpload({ fetchImpl: async () => response('IN_PROGRESS'), token: 'test', publisher: 'publisher', extensionId: 'extension', initialState: 'IN_PROGRESS', timeoutMs: 5, sleep: async () => {}, now: (() => { let t = 0; return () => (t += 10); })(), log: () => {} }), /timed out/);
 console.log('store upload fail-closed and no-publish checks passed');
