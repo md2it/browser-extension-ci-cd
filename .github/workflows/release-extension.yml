@@ -15,6 +15,32 @@ on:
         description: Path to the Markdown changelog in the calling repository.
         required: true
         type: string
+      chrome-extension-id:
+        description: Chrome Web Store extension ID.
+        required: false
+        type: string
+      chrome-publisher-id:
+        description: Chrome Web Store publisher ID.
+        required: false
+        type: string
+      store-upload-enabled:
+        description: Explicit product opt-in; must be true together with repository variable STORE_UPLOAD_ENABLED=true.
+        required: false
+        type: string
+      amo-addon-id:
+        description: AMO add-on ID or slug, documented only until a safe listed upload contract exists.
+        required: false
+        type: string
+    secrets:
+      chrome-service-account-json:
+        description: Google service-account JSON for Chrome Web Store API.
+        required: false
+      amo-jwt-issuer:
+        description: AMO JWT issuer; reserved for a future explicitly approved AMO flow.
+        required: false
+      amo-jwt-secret:
+        description: AMO JWT secret; reserved for a future explicitly approved AMO flow.
+        required: false
 
 jobs:
   release:
@@ -93,7 +119,7 @@ jobs:
 
       - name: Build release ZIP
         id: build
-        uses: md2it/browser-extension-ci-cd@v1.1.0
+        uses: md2it/browser-extension-ci-cd@v1.3.0
         with:
           extension-root: ${{ inputs.extension-root }}
           output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}
@@ -110,3 +136,41 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
+
+  chrome-upload:
+    name: Upload to Chrome Web Store (no publish)
+    needs: release
+    if: ${{ inputs.store-upload-enabled == 'true' && vars.STORE_UPLOAD_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate Chrome upload configuration
+        env:
+          CHROME_ID: ${{ inputs.chrome-extension-id }}
+          CHROME_PUBLISHER_ID: ${{ inputs.chrome-publisher-id }}
+          SERVICE_ACCOUNT_JSON: ${{ secrets.chrome-service-account-json }}
+        run: |
+          set -euo pipefail
+          [[ -n "$CHROME_ID" ]] || { echo '::error::chrome-extension-id is required when store upload is enabled.'; exit 1; }
+          [[ -n "$CHROME_PUBLISHER_ID" ]] || { echo '::error::chrome-publisher-id is required when store upload is enabled.'; exit 1; }
+          [[ -n "$SERVICE_ACCOUNT_JSON" ]] || { echo '::error::chrome-service-account-json secret is required before any API request.'; exit 1; }
+
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: md2it/browser-extension-ci-cd
+          ref: v1.3.0
+          path: .central-ci-cd
+      - name: Download ZIP from GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_NAME: ${{ inputs.zip-name }}
+        run: gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$ZIP_NAME" --dir "$RUNNER_TEMP/store-upload"
+      - name: Upload ZIP draft and verify status (never publish)
+        env:
+          CHROME_EXTENSION_ID: ${{ inputs.chrome-extension-id }}
+          CHROME_PUBLISHER_ID: ${{ inputs.chrome-publisher-id }}
+          CHROME_SERVICE_ACCOUNT_JSON: ${{ secrets.chrome-service-account-json }}
+          ZIP_PATH: ${{ runner.temp }}/${{ 'store-upload' }}/${{ inputs.zip-name }}
+        run: node .central-ci-cd/scripts/chrome-webstore-upload.mjs "$ZIP_PATH"

@@ -5,7 +5,7 @@
   "description": "Reusable build and packaging tooling for browser extensions.",
   "scripts": {
     "build:extension": "node scripts/build-extension.mjs",
-    "test": "node test/build-extension.test.mjs"
+    "test": "node test/build-extension.test.mjs && node test/store-upload.test.mjs"
   },
   "devDependencies": {
     "esbuild": "^0.25.0"

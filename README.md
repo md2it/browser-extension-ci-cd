@@ -54,4 +54,15 @@ jobs:
       extension-root: extension
       zip-name: extension.zip
       changelog-path: CHANGELOG.md
+      chrome-extension-id: ${{ vars.CHROME_EXTENSION_ID }}
+      chrome-publisher-id: ${{ vars.CHROME_PUBLISHER_ID }}
+      store-upload-enabled: ${{ vars.STORE_UPLOAD_ENABLED }}
+    secrets:
+      chrome-service-account-json: ${{ secrets.CHROME_SERVICE_ACCOUNT_JSON }}
 ```
+
+Store upload is fail-closed: both the product input and repository variable `STORE_UPLOAD_ENABLED` must equal `true`. The reusable workflow downloads the ZIP from the GitHub Release, uploads it to the Chrome Web Store v2 `:upload` endpoint, and reports its upload state. It never calls `:publish`; upload can still enter Chrome review according to store rules, but users are not published to by this workflow.
+
+For each product, create variables `STORE_UPLOAD_ENABLED` (leave unset or any value other than `true`), `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, and `AMO_ADDON_ID` as applicable. Create secret `CHROME_SERVICE_ACCOUNT_JSON` only after enabling the integration; the service-account email must be granted Chrome Web Store API access. Missing IDs or the secret fail before a store request. AMO secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` are reserved and are not used by the current workflow.
+
+AMO listed upload is intentionally not automated. Current AMO v5 upload requires a `channel` (`listed` or `unlisted`); `listed` submits a version for listing/moderation and does not provide a guaranteed upload-only/no-publication operation. Use the AMO dashboard/manual review flow. `unlisted` signing may be performed manually when self-distribution is intended. To disable Chrome integration, unset or change `STORE_UPLOAD_ENABLED` and/or the product input.
