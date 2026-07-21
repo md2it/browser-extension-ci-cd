@@ -1,0 +1,112 @@
+name: Release browser extension
+
+on:
+  workflow_call:
+    inputs:
+      extension-root:
+        description: Path to the extension root containing manifest.json.
+        required: true
+        type: string
+      zip-name:
+        description: Stable filename for the release ZIP archive.
+        required: true
+        type: string
+      changelog-path:
+        description: Path to the Markdown changelog in the calling repository.
+        required: true
+        type: string
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+
+      - name: Validate tag, manifest, and inputs
+        env:
+          EXTENSION_ROOT: ${{ inputs.extension-root }}
+          ZIP_NAME: ${{ inputs.zip-name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE:-}" != "tag" || ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Release workflow requires a tag in vX.Y.Z format; received ${GITHUB_REF_NAME:-unknown}."
+            exit 1
+          fi
+
+          if [[ ! "$ZIP_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]*\.zip$ ]]; then
+            echo "::error::zip-name must be a stable .zip filename without path separators; received $ZIP_NAME."
+            exit 1
+          fi
+
+          manifest="$EXTENSION_ROOT/manifest.json"
+          if [[ ! -f "$manifest" ]]; then
+            echo "::error::manifest.json not found at $manifest."
+            exit 1
+          fi
+
+          node - "$manifest" "${GITHUB_REF_NAME#v}" <<'NODE'
+          const [manifestPath, tagVersion] = process.argv.slice(2);
+          let manifest;
+          try {
+            manifest = JSON.parse(require("node:fs").readFileSync(manifestPath, "utf8"));
+          } catch (error) {
+            console.error(`::error::manifest.json is invalid: ${error.message}`);
+            process.exit(1);
+          }
+          if (manifest.version !== tagVersion) {
+            console.error(`::error::Tag version ${tagVersion} does not match manifest version ${manifest.version ?? "(missing)"}.`);
+            process.exit(1);
+          }
+          NODE
+
+      - name: Extract release notes from changelog
+        env:
+          CHANGELOG_PATH: ${{ inputs.changelog-path }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          changelog="$CHANGELOG_PATH"
+          notes="$RUNNER_TEMP/release-notes.md"
+          version="${GITHUB_REF_NAME#v}"
+          heading="### $version"
+
+          if [[ ! -f "$changelog" ]]; then
+            echo "::error::CHANGELOG not found: $changelog."
+            exit 1
+          fi
+
+          if ! awk -v heading="$heading" '
+            $0 == heading { found = 1; next }
+            found && /^### / { exit }
+            found { print }
+            END { if (!found) exit 2 }
+          ' "$changelog" > "$notes"; then
+            echo "::error::CHANGELOG section '$heading' was not found in $changelog."
+            exit 1
+          fi
+
+      - name: Build release ZIP
+        id: build
+        uses: md2it/browser-extension-ci-cd@v1.1.0
+        with:
+          extension-root: ${{ inputs.extension-root }}
+          output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}
+
+      - name: Create published GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ZIP_PATH: ${{ steps.build.outputs.zip-path }}
+          ZIP_NAME: ${{ inputs.zip-name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" "$ZIP_PATH#$ZIP_NAME" \
+            --target "$GITHUB_SHA" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"

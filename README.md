@@ -41,3 +41,17 @@ steps:
 ```
 
 The resulting absolute ZIP path is available as `steps.package.outputs.zip-path`.
+
+## Reusable release workflow
+
+`release-extension.yml` is a reusable workflow for a version-tag release. It validates that the `vX.Y.Z` tag matches `manifest.json`, builds the ZIP, uses the corresponding `### X.Y.Z` section of the changelog as release notes, and creates a published GitHub Release.
+
+```yaml
+jobs:
+  release:
+    uses: md2it/browser-extension-ci-cd/.github/workflows/release-extension.yml@v1.1.0
+    with:
+      extension-root: extension
+      zip-name: extension.zip
+      changelog-path: CHANGELOG.md
+```
