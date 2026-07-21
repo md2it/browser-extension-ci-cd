@@ -33,7 +33,7 @@ steps:
   - uses: actions/setup-node@v4
     with:
       node-version: 20
-  - uses: md2it/browser-extension-ci-cd@main
+  - uses: md2it/browser-extension-ci-cd@v1.0.0
     id: package
     with:
       extension-root: extension
