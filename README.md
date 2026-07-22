@@ -57,14 +57,15 @@ jobs:
       chrome-extension-id: ${{ vars.CHROME_EXTENSION_ID }}
       chrome-publisher-id: ${{ vars.CHROME_PUBLISHER_ID }}
       store-upload-enabled: ${{ vars.STORE_UPLOAD_ENABLED }}
+      store-publish-enabled: ${{ vars.STORE_PUBLISH_ENABLED }}
     secrets:
       chrome-service-account-json: ${{ secrets.CHROME_SERVICE_ACCOUNT_JSON }}
 ```
 
-Store upload is fail-closed: both the product input and repository variable `STORE_UPLOAD_ENABLED` must equal `true`. The reusable workflow downloads the ZIP from the GitHub Release, uploads it to the Chrome Web Store v2 `:upload` endpoint, and reports its upload state. It never calls `:publish`; upload can still enter Chrome review according to store rules, but users are not published to by this workflow.
+Store upload is fail-closed: both the product input and repository variable `STORE_UPLOAD_ENABLED` must equal `true`. Chrome upload uses v2 `:upload` and `:fetchStatus`; a separate job calls only v2 `:publish` after successful upload and double opt-in. Chrome publish submits the version for review; it can become public only after Chrome review/signing and according to the item's existing visibility settings.
 
 For each product, create variables `STORE_UPLOAD_ENABLED` (leave unset or any value other than `true`), `CHROME_EXTENSION_ID`, `CHROME_PUBLISHER_ID`, and `AMO_ADDON_ID` as applicable. Create secret `CHROME_SERVICE_ACCOUNT_JSON` only after enabling the integration; the service-account email must be granted Chrome Web Store API access. Missing IDs or the secret fail before a store request. AMO secrets `AMO_JWT_ISSUER` and `AMO_JWT_SECRET` are reserved and are not used by the current workflow.
 
-AMO listed upload is intentionally not automated. Current AMO v5 upload requires a `channel` (`listed` or `unlisted`); `listed` submits a version for listing/moderation and does not provide a guaranteed upload-only/no-publication operation. Use the AMO dashboard/manual review flow. `unlisted` signing may be performed manually when self-distribution is intended. To disable Chrome integration, unset or change `STORE_UPLOAD_ENABLED` and/or the product input.
+AMO uses v5: upload ZIP with `channel=listed`, poll `/addons/upload/{uuid}/` until validation completes, and only with double publish opt-in create a version with the same validated upload UUID. Validation-only mode does not submit a version. A listed submission enters AMO review/signing; it becomes available to users only after AMO approves and signs it, subject to AMO processing. AMO requires `AMO_ADDON_ID`, `AMO_JWT_ISSUER`, and `AMO_JWT_SECRET`. To disable integrations, leave `STORE_UPLOAD_ENABLED` and `STORE_PUBLISH_ENABLED` unset or change them from `true`.
 
 If Chrome returns `IN_PROGRESS`, the workflow polls `publishers.items.fetchStatus` with exponential backoff: 1s, 2s, 4s, up to 10s, for a maximum total of 5 minutes. `SUCCEEDED` succeeds; `FAILED`, `NOT_FOUND`, invalid/unknown states, invalid JSON, HTTP errors, and timeout fail the job. Logs contain status and HTTP codes only; credentials and Authorization headers are never logged.
