@@ -54,7 +54,7 @@ jobs:
       contents: write
     steps:
       - name: Check out tagged source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate tag, manifest, and inputs
         env:
@@ -123,7 +123,7 @@ jobs:
 
       - name: Build release ZIP
         id: build
-        uses: md2it/browser-extension-ci-cd@v1.4.0
+        uses: md2it/browser-extension-ci-cd@v1.4.2
         with:
           extension-root: ${{ inputs.extension-root }}
           output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}
@@ -160,8 +160,8 @@ jobs:
           [[ -n "$CHROME_PUBLISHER_ID" ]] || { echo '::error::chrome-publisher-id is required when store upload is enabled.'; exit 1; }
           [[ -n "$SERVICE_ACCOUNT_JSON" ]] || { echo '::error::chrome-service-account-json secret is required before any API request.'; exit 1; }
 
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
           ref: v1.4.0
@@ -186,8 +186,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: read }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
           ref: v1.4.0
@@ -214,8 +214,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions: { contents: read }
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
           ref: v1.4.0
