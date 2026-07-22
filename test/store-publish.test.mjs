@@ -10,6 +10,8 @@ const workflow = readFileSync(new URL('../.github/workflows/release-extension.ym
 const chromeScript = readFileSync(new URL('../scripts/chrome-webstore-publish.mjs', import.meta.url), 'utf8');
 assert.match(workflow, /chrome-publish:/); assert.match(workflow, /needs: chrome-upload/);
 assert.match(workflow, /inputs\.store-publish-enabled == 'true'/); assert.match(workflow, /vars\.STORE_PUBLISH_ENABLED == 'true'/);
+assert.match(workflow, /AMO_ADDON_ID is required/); assert.match(workflow, /AMO_JWT_ISSUER secret is required/); assert.match(workflow, /AMO_JWT_SECRET secret is required/);
+assert.match(workflow, /if \(!manifestId\)/);
 const amoScript = readFileSync(new URL('../scripts/amo-upload.mjs', import.meta.url), 'utf8');
 assert.match(chromeScript, /:publish/); assert.match(amoScript, /BASE.*addons/);
 let calls = [];

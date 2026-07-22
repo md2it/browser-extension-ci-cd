@@ -210,7 +210,7 @@ jobs:
   amo-upload:
     name: Upload and validate AMO package
     needs: release
-    if: ${{ inputs.store-upload-enabled == 'true' && vars.STORE_UPLOAD_ENABLED == 'true' && inputs.amo-addon-id != '' && secrets.amo-jwt-issuer != '' && secrets.amo-jwt-secret != '' }}
+    if: ${{ inputs.store-upload-enabled == 'true' && vars.STORE_UPLOAD_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     permissions: { contents: read }
     steps:
@@ -220,18 +220,24 @@ jobs:
           repository: md2it/browser-extension-ci-cd
           ref: v1.4.0
           path: .central-ci-cd
-      - name: Validate AMO ID and manifest version
+      - name: Validate AMO configuration before any API request
         env:
-          EXTENSION_ROOT: ${{ inputs.extension-root }}
           AMO_ADDON_ID: ${{ inputs.amo-addon-id }}
+          AMO_JWT_ISSUER: ${{ secrets.amo-jwt-issuer }}
+          AMO_JWT_SECRET: ${{ secrets.amo-jwt-secret }}
+          EXTENSION_ROOT: ${{ inputs.extension-root }}
         run: |
           set -euo pipefail
+          [[ -n "$AMO_ADDON_ID" ]] || { echo '::error::AMO_ADDON_ID is required when AMO upload is enabled.'; exit 1; }
+          [[ -n "$AMO_JWT_ISSUER" ]] || { echo '::error::AMO_JWT_ISSUER secret is required when AMO upload is enabled.'; exit 1; }
+          [[ -n "$AMO_JWT_SECRET" ]] || { echo '::error::AMO_JWT_SECRET secret is required when AMO upload is enabled.'; exit 1; }
           node - "$EXTENSION_ROOT/manifest.json" "$AMO_ADDON_ID" "${GITHUB_REF_NAME#v}" <<'NODE'
           const [manifestPath, addonId, tagVersion] = process.argv.slice(2);
           const manifest = JSON.parse(require('node:fs').readFileSync(manifestPath, 'utf8'));
           if (manifest.version !== tagVersion) throw new Error(`manifest version ${manifest.version} does not match tag ${tagVersion}`);
           const manifestId = manifest.browser_specific_settings?.gecko?.id;
-          if (manifestId && manifestId !== addonId) throw new Error(`manifest Gecko ID ${manifestId} does not match AMO_ADDON_ID`);
+          if (!manifestId) throw new Error('manifest browser_specific_settings.gecko.id is required for AMO automation');
+          if (manifestId !== addonId) throw new Error(`manifest Gecko ID ${manifestId} does not match AMO_ADDON_ID`);
           NODE
       - name: Download ZIP from GitHub Release
         env:
