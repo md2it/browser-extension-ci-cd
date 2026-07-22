@@ -9,7 +9,7 @@ export function validateAmoConfiguration({ uploadEnabled, publishEnabled, addonI
   return { enabled: true };
 }
 
-export async function uploadAndValidateAmo({ zipPath, addonId, jwt, fetchImpl = fetch, timeoutMs = 10 * 60 * 1000, sleep = sleepDefault, now = () => Date.now(), log = console.log, submit = false }) {
+export async function uploadAndValidateAmo({ zipPath, addonId, jwt, releaseNotes, fetchImpl = fetch, timeoutMs = 10 * 60 * 1000, sleep = sleepDefault, now = () => Date.now(), log = console.log, submit = false }) {
   if (!zipPath || !addonId || !jwt) throw new Error('AMO requires ZIP path, AMO_ADDON_ID, and JWT before any API request.');
   const form = new FormData(); form.append('upload', new Blob([readFileSync(zipPath)]), 'extension.zip'); form.append('channel', 'listed');
   const headers = { Authorization: `JWT ${jwt}` };
@@ -28,7 +28,8 @@ export async function uploadAndValidateAmo({ zipPath, addonId, jwt, fetchImpl = 
   }
   if (detail.valid !== true) throw new Error('AMO validation failed; listed submission was not sent.');
   if (!submit) return detail;
-  const submission = await fetchImpl(`${BASE}/addons/addon/${encodeURIComponent(addonId)}/versions/`, { method: 'POST', headers, body: (() => { const f = new FormData(); f.append('upload', created.uuid); return f; })() });
+  if (!releaseNotes) throw new Error('AMO release notes are required before listed submission.');
+  const submission = await fetchImpl(`${BASE}/addons/addon/${encodeURIComponent(addonId)}/versions/`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ upload: created.uuid, release_notes: { 'en-US': releaseNotes } }) });
   if (!submission.ok) throw new Error(`AMO listed submission failed: HTTP ${submission.status}.`);
   return submission.json();
 }
@@ -41,7 +42,8 @@ if (process.argv[1] === new URL(import.meta.url).pathname) {
     const header = b64(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
     const payload = b64(JSON.stringify({ iss: process.env.AMO_JWT_ISSUER, jti: randomUUID(), iat: now, exp: now + 300 }));
     const jwt = `${header}.${payload}.${createHmac('sha256', process.env.AMO_JWT_SECRET).update(`${header}.${payload}`).digest('base64url')}`;
-    await uploadAndValidateAmo({ zipPath: process.env.ZIP_PATH, addonId: process.env.AMO_ADDON_ID, jwt, submit: process.env.STORE_PUBLISH_ENABLED === 'true' && process.env.REPOSITORY_STORE_PUBLISH_ENABLED === 'true' });
+    const releaseNotes = process.env.RELEASE_NOTES_PATH ? readFileSync(process.env.RELEASE_NOTES_PATH, 'utf8').trim() : '';
+    await uploadAndValidateAmo({ zipPath: process.env.ZIP_PATH, addonId: process.env.AMO_ADDON_ID, jwt, releaseNotes, submit: process.env.STORE_PUBLISH_ENABLED === 'true' && process.env.REPOSITORY_STORE_PUBLISH_ENABLED === 'true' });
     console.log('AMO upload and validation completed.');
   } catch (error) { console.error(`::error::${error.message}`); process.exitCode = 1; }
 }

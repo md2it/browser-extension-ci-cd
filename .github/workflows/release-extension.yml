@@ -95,6 +95,13 @@ jobs:
           }
           NODE
 
+      - name: Check out central CI/CD helper
+        uses: actions/checkout@v7
+        with:
+          repository: md2it/browser-extension-ci-cd
+          ref: v1.4.3
+          path: .central-ci-cd
+
       - name: Extract release notes from changelog
         env:
           CHANGELOG_PATH: ${{ inputs.changelog-path }}
@@ -102,28 +109,12 @@ jobs:
         run: |
           set -euo pipefail
           changelog="$CHANGELOG_PATH"
-          notes="$RUNNER_TEMP/release-notes.md"
           version="${GITHUB_REF_NAME#v}"
-          heading="### $version"
-
-          if [[ ! -f "$changelog" ]]; then
-            echo "::error::CHANGELOG not found: $changelog."
-            exit 1
-          fi
-
-          if ! awk -v heading="$heading" '
-            $0 == heading { found = 1; next }
-            found && /^### / { exit }
-            found { print }
-            END { if (!found) exit 2 }
-          ' "$changelog" > "$notes"; then
-            echo "::error::CHANGELOG section '$heading' was not found in $changelog."
-            exit 1
-          fi
+          node .central-ci-cd/scripts/extract-changelog-section.mjs "$changelog" "$version" > "$RUNNER_TEMP/release-notes.md"
 
       - name: Build release ZIP
         id: build
-        uses: md2it/browser-extension-ci-cd@v1.4.2
+        uses: md2it/browser-extension-ci-cd@v1.4.3
         with:
           extension-root: ${{ inputs.extension-root }}
           output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}
@@ -140,6 +131,12 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "$GITHUB_REF_NAME" \
             --notes-file "$RUNNER_TEMP/release-notes.md"
+
+      - name: Preserve release notes for store jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes.md
 
   chrome-upload:
     name: Upload to Chrome Web Store
@@ -164,7 +161,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
-          ref: v1.4.0
+          ref: v1.4.3
           path: .central-ci-cd
       - name: Download ZIP from GitHub Release
         env:
@@ -190,7 +187,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
-          ref: v1.4.0
+          ref: v1.4.3
           path: .central-ci-cd
       - name: Validate Chrome publish configuration
         env:
@@ -218,7 +215,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           repository: md2it/browser-extension-ci-cd
-          ref: v1.4.0
+          ref: v1.4.3
           path: .central-ci-cd
       - name: Validate AMO configuration before any API request
         env:
@@ -244,6 +241,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ZIP_NAME: ${{ inputs.zip-name }}
         run: gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "$ZIP_NAME" --dir "$RUNNER_TEMP/store-upload"
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: ${{ runner.temp }}/release-notes
       - name: Upload and validate AMO
         env:
           ZIP_PATH: ${{ runner.temp }}/store-upload/${{ inputs.zip-name }}
@@ -252,4 +254,5 @@ jobs:
           AMO_JWT_SECRET: ${{ secrets.amo-jwt-secret }}
           STORE_PUBLISH_ENABLED: ${{ inputs.store-publish-enabled }}
           REPOSITORY_STORE_PUBLISH_ENABLED: ${{ vars.STORE_PUBLISH_ENABLED }}
+          RELEASE_NOTES_PATH: ${{ runner.temp }}/release-notes/release-notes.md
         run: node .central-ci-cd/scripts/amo-upload.mjs

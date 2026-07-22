@@ -24,8 +24,10 @@ assert.deepEqual(validateAmoConfiguration({ uploadEnabled: 'false', publishEnabl
 await assert.rejects(uploadAndValidateAmo({ zipPath: fixture, addonId: '', jwt: '', fetchImpl: fetchOk })); assert.equal(calls.length, 0);
 calls = [];
 const amoFetch = async (url, options) => { calls.push({ url, options }); if (url.endsWith('/upload/')) return { ok: true, json: async () => ({ uuid: 'u' }) }; return { ok: true, json: async () => ({ processed: true, valid: true }) }; };
-await uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: amoFetch, submit: false }); assert.equal(calls.length, 2);
-await uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: amoFetch, submit: true }); assert.equal(calls.length, 5); assert.match(calls.at(-1).url, /versions\/$/);
+await uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: amoFetch, releaseNotes: '- Notes', submit: false }); assert.equal(calls.length, 2);
+await uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: amoFetch, releaseNotes: '- Notes', submit: true }); assert.equal(calls.length, 5); assert.match(calls.at(-1).url, /versions\/$/);
+assert.deepEqual(JSON.parse(calls.at(-1).options.body), { upload: 'u', release_notes: { 'en-US': '- Notes' } });
+calls = []; await uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: amoFetch, submit: true }).catch(() => {}); assert.equal(calls.length, 2);
 const invalid = async (url) => { calls.push(url); return url.endsWith('/upload/') ? { ok: true, json: async () => ({ uuid: 'u' }) } : { ok: true, json: async () => ({ processed: true, valid: false }) }; };
 calls = []; await assert.rejects(uploadAndValidateAmo({ zipPath: fixture, addonId: 'a', jwt: 't', fetchImpl: invalid, submit: true })); assert.equal(calls.length, 2);
 console.log('store publish and AMO fail-closed mock tests passed');
