@@ -26,9 +26,12 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
 
+      - name: Run browser tests
+        uses: md2it/browser-extension-ci-cd/test-extension@v1.4.5
+
       - name: Build ZIP
         id: build
-        uses: md2it/browser-extension-ci-cd@v1.4.4
+        uses: md2it/browser-extension-ci-cd@v1.4.5
         with:
           extension-root: ${{ inputs.extension-root }}
           output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}

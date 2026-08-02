@@ -1,0 +1,8 @@
+name: Run browser extension tests
+description: Run a product browser test suite using the shared test runner.
+runs:
+  using: composite
+  steps:
+    - name: Execute browser tests
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/../test-runner/run-tests.sh \"$GITHUB_WORKSPACE\""
