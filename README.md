@@ -23,6 +23,16 @@ Run the minimal packaging check with:
 npm test
 ```
 
+## Shared browser test runner
+
+Product repositories keep their own `tests/index.html` and business tests. The shared runner owns localhost, browser execution, cleanup, exit codes, JSON reporting, and the browser test harness.
+
+```sh
+./test-runner/run-tests.sh /path/to/extension-project
+```
+
+It requires Python 3 and Chrome or Chromium. Exit code `0` means passed, `1` means failed tests, and `2` means an infrastructure error. `TEST_BROWSER` can point to a non-standard browser executable.
+
 ## GitHub Action
 
 The composite action invokes the same builder. The calling workflow must check out the extension repository and provide Node.js 20 or later.
