@@ -28,7 +28,7 @@ jobs:
 
       - name: Build ZIP
         id: build
-        uses: md2it/browser-extension-ci-cd@v1.4.2
+        uses: md2it/browser-extension-ci-cd@v1.4.4
         with:
           extension-root: ${{ inputs.extension-root }}
           output-zip: ${{ runner.temp }}/${{ inputs.zip-name }}

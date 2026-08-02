@@ -7,6 +7,10 @@ inputs:
   output-zip:
     description: Path for the created ZIP archive.
     required: true
+  test-before-build:
+    description: Run the product browser test suite before creating the ZIP archive.
+    required: false
+    default: "true"
 outputs:
   zip-path:
     description: Absolute path to the created ZIP archive.
@@ -14,6 +18,10 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Run browser tests
+      if: ${{ inputs.test-before-build == 'true' }}
+      shell: bash
+      run: "$GITHUB_ACTION_PATH/test-runner/run-tests.sh \"$GITHUB_WORKSPACE\""
     - name: Install build dependencies
       shell: bash
       run: npm ci --prefix "$GITHUB_ACTION_PATH"
